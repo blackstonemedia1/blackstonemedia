@@ -967,5 +967,140 @@ a[class*="Header_logo"] img {
 })();
 </script>
 
+
+<script id="bsm-contact-form-handler">
+document.addEventListener("DOMContentLoaded", function() {
+  const form = document.querySelector("form.Form_form___noC4");
+  if (!form) return;
+
+  const fileInput = document.getElementById("files");
+  if (fileInput) {
+    const fileLabel = fileInput.nextElementSibling;
+    fileInput.addEventListener("change", function() {
+      if (this.files && this.files.length > 0) {
+        if (fileLabel) fileLabel.textContent = this.files.length === 1 ? this.files[0].name : this.files.length + " files selected";
+      } else {
+        if (fileLabel) fileLabel.textContent = "Attachments";
+      }
+    });
+  }
+
+  form.addEventListener("submit", async function(e) {
+    e.preventDefault();
+    
+    const submitBtn = form.querySelector("button[type='submit']");
+    const originalBtnText = submitBtn ? submitBtn.innerHTML : "Submit";
+    
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>Sending... </span><svg class="Form_buttonArrow__OCLQj" style="animation: spin 1s linear infinite;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="16"></circle></svg>';
+    }
+
+    const formData = new FormData(form);
+    const interestedIn = [];
+    form.querySelectorAll("input[name='interestedIn']:checked").forEach(cb => interestedIn.push(cb.value));
+
+    const payload = {
+      first_name: formData.get("firstName") || "",
+      last_name: formData.get("lastName") || "",
+      email: formData.get("email") || "",
+      phone: formData.get("phone") || "",
+      budget: formData.get("budget") || "",
+      message: formData.get("message") || "",
+      interested_in: interestedIn.join(", "),
+      source: "blackstonemedia.io/contact",
+      created_at: new Date().toISOString()
+    };
+
+    // 1. Send to Supabase
+    const SUPABASE_URL = "https://vivxdypfspwwwvdfwyei.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_Or9l24blW0PchcK3NECPSg_7oGgtyM9";
+    
+    try {
+      fetch(`${SUPABASE_URL}/rest/v1/contacts`, {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_KEY,
+          "Authorization": `Bearer ${SUPABASE_KEY}`,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify(payload)
+      }).catch(err => console.log("Supabase log:", err));
+    } catch(err) {}
+
+    // 2. Send via Email Gateway (FormSubmit AJAX with CC to all agency inboxes)
+    try {
+      await fetch("https://formsubmit.co/ajax/inquiry@blackstonemedia.io", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          _subject: `New Project Inquiry: ${payload.first_name} ${payload.last_name} (${payload.budget || "Budget not specified"})`,
+          _cc: "thehouseofbrands07@gmail.com",
+          _template: "table",
+          "Name": `${payload.first_name} ${payload.last_name}`,
+          "Email": payload.email,
+          "Phone": payload.phone || "Not provided",
+          "Services Interested In": payload.interested_in || "None selected",
+          "Budget ($)": payload.budget || "Not provided",
+          "Message": payload.message || "No message provided",
+          "Submitted At": new Date().toLocaleString()
+        })
+      });
+    } catch(err) {
+      console.log("Email gateway:", err);
+    }
+
+    // 3. Show Sleek Success State
+    const formOuter = form.closest(".Form_formOuter__NHTHq") || form.parentElement;
+    form.style.display = "none";
+    
+    let successBox = document.getElementById("bsm-success-box");
+    if (!successBox) {
+      successBox = document.createElement("div");
+      successBox.id = "bsm-success-box";
+      successBox.style.cssText = "padding: 3.5rem 2rem; text-align: center; background: #ffffff; border-radius: 1.75rem; border: 1.5px solid #000000; box-shadow: 0 20px 50px rgba(0,0,0,0.06); margin-top: 1rem;";
+      successBox.innerHTML = `
+        <div style="width: 64px; height: 64px; border-radius: 50%; background: #000000; color: #ffffff; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; font-size: 28px;">
+          ✓
+        </div>
+        <h3 style="font-size: clamp(1.8rem, 3vw, 2.4rem); font-weight: 700; color: #000000; margin-bottom: 0.75rem; font-family: inherit;">
+          Thank You, ${payload.first_name || "there"}!
+        </h3>
+        <p style="font-size: 1.1rem; color: #555555; max-width: 500px; margin: 0 auto 2rem; line-height: 1.6;">
+          Your inquiry has been successfully received. We will review your project requirements and respond to <strong style="color:#000;">${payload.email}</strong> within 24 hours.
+        </p>
+        <button id="bsm-reset-form-btn" style="display: inline-flex; align-items: center; justify-content: center; font-size: 0.95rem; font-weight: 500; padding: 0.75rem 1.8rem; background: #000000; color: #ffffff; border: none; border-radius: 2rem; cursor: pointer; transition: opacity 0.2s ease;">
+          Send Another Message
+        </button>
+      `;
+      formOuter.appendChild(successBox);
+      
+      document.getElementById("bsm-reset-form-btn").addEventListener("click", function() {
+        form.reset();
+        if (fileLabel) fileLabel.textContent = "Attachments";
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalBtnText;
+        }
+        successBox.style.display = "none";
+        form.style.display = "";
+      });
+    } else {
+      successBox.style.display = "block";
+    }
+  });
+});
+</script>
+<style>
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+</style>
+
 </body>
 </html>
